@@ -1,9 +1,15 @@
+import edu.princeton.cs.algs4.DirectedEdge;
 import edu.princeton.cs.algs4.Picture;
+import edu.princeton.cs.algs4.Queue;
 
 public class SeamCarver {
 
     private final Picture picture;
     private final double[][] energy;
+    private Queue<Integer> order;     // vertices in topological order
+    private int[] ranks;
+    private double[] distTo;
+    private int[] edgeTo;
 
     /**
      * create a seam carver object based on the given picture
@@ -102,21 +108,37 @@ public class SeamCarver {
      * @return
      */
     public int[] findHorizontalSeam() {
+
+
         throw new RuntimeException();
     }
 
     /**
      * sequence of indices for vertical seam
-     * 
+     *
      * @return
      */
     public int[] findVerticalSeam() {
+        int size = width()*height();
+        distTo = new double[size];
+        edgeTo = new int[size];
+
+        for (int v = 0; v < size; v++)
+            distTo[v] = Double.POSITIVE_INFINITY;
+
+        Iterable<Integer> topologicalY = calculateTopologicalY(size);
+
+        for (int v : topologicalY) {
+            for (int w : adjY(v))
+                relaxY(v, w);
+        }
+
         throw new RuntimeException();
     }
 
     /**
      * remove horizontal seam from current picture
-     * 
+     *
      * @param seam
      */
     public void removeHorizontalSeam(int[] seam) {
@@ -126,11 +148,68 @@ public class SeamCarver {
 
     /**
      * remove vertical seam from current picture
-     * 
+     *
      * @param seam
      */
     public void removeVerticalSeam(int[] seam) {
         if (seam == null) throw new IllegalArgumentException("The vertical seam does not have to be null");
         throw new RuntimeException();
+    }
+
+    // relax edge e
+    private void relaxY(int v, int w) {
+        int y = w % width();
+        int x = w - 1 - (y * width());
+        if (distTo[w] > distTo[v] + energy[x][y]) {
+            distTo[w] = distTo[v] + energy[x][y];
+            edgeTo[y] = x;
+        }
+    }
+
+    private Iterable<Integer> calculateTopologicalY(int size) {
+        // indegrees of remaining vertices
+        int[] indegree = new int[size];
+        for (int v = 0; v < size; v++) {
+            indegree[v] = indegreeY(v);
+        }
+
+        // initialize
+        ranks = new int[size];
+        order = new Queue<Integer>();
+        int count = 0;
+
+        // initialize queue to contain all vertices with indegree = 0
+        Queue<Integer> queue = new Queue<Integer>();
+        for (int v = 0; v < size; v++)
+            if (indegree[v] == 0) queue.enqueue(v);
+
+        while (!queue.isEmpty()) {
+            int v = queue.dequeue();
+            order.enqueue(v);
+            ranks[v] = count++;
+            for (int w : adjY(v)) {
+                indegree[w]--;
+                if (indegree[w] == 0) queue.enqueue(w);
+            }
+        }
+        return queue;
+    }
+
+    private int indegreeY(int node) {
+        int y = node % width();
+        int x = node - 1 - (y * width());
+        if (y == 0) return 0;
+        if (x == 0 || x == width()-1) return 2;
+        return 3;
+    }
+
+    private int[] adjY(int node) {
+        int y = node % width();
+        int x = node - 1 - (y * width());
+
+        if (y == 0) return new int[0];
+        if (x == 0) return new int[]{node+width(), node+width()+1};
+        if (x == width()-1) return new int[]{node+width()-1, node+width()};
+        return new int[]{node+width()-1, node+width(), node+width()+1};
     }
 }
