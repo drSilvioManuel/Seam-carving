@@ -27,8 +27,8 @@ public class SeamCarver {
         this.energy = new double[this.width][this.height];
         this.colorMatrix = new int[this.width][this.height];
 
-        for (int x=0; x<this.width; x++) {
-            for (int y=0; y<this.height; y++) {
+        for (int x=0; x<this.width-1; x++) {
+            for (int y=0; y<this.height-1; y++) {
                 colorMatrix[x][y] = picture.getRGB(x, y);
                 colorMatrix[x+1][y] = picture.getRGB(x+1, y);
                 colorMatrix[x][y+1] = picture.getRGB(x, y+1);
@@ -132,10 +132,19 @@ public class SeamCarver {
         energy = transposeMatrix(energy);
         colorMatrix = transposeMatrix(colorMatrix);
 
+        int originWidth = width;
+        int originHeight = height;
+
+        width = height;
+        height =  originWidth;
+
         findVerticalSeam();
 
         energy = transposeMatrix(energy);
         colorMatrix = transposeMatrix(colorMatrix);
+
+        width = height;
+        height = originHeight;
 
         return edgeTo;
     }
