@@ -5,11 +5,14 @@ import edu.princeton.cs.algs4.Queue;
 public class SeamCarver {
 
     private final Picture picture;
-    private final double[][] energy;
+    private double[][] energy;
     private Queue<Integer> order;     // vertices in topological order
     private int[] ranks;
     private double[] distTo;
     private int[] edgeTo;
+    private int width;
+    private int height;
+    private int [][] colorMatrix;
 
     /**
      * create a seam carver object based on the given picture
@@ -19,7 +22,19 @@ public class SeamCarver {
     public SeamCarver(Picture picture) {
         if (picture == null) throw new IllegalArgumentException("The picture arg does not have to be null");
         this.picture = picture;
-        this.energy = new double[picture.width()][picture.height()];
+        this.width = picture.width();
+        this.height = picture.height();
+        this.energy = new double[this.width][this.height];
+        this.colorMatrix = new int[this.width][this.height];
+
+        for (int x=0; x<this.width; x++) {
+            for (int y=0; y<this.height; y++) {
+                colorMatrix[x][y] = picture.getRGB(x, y);
+                colorMatrix[x+1][y] = picture.getRGB(x+1, y);
+                colorMatrix[x][y+1] = picture.getRGB(x, y+1);
+                energy(x, y);
+            }
+        }
     }
 
     /**
@@ -28,7 +43,12 @@ public class SeamCarver {
      * @return
      */
     public Picture picture() {
-        return picture;
+        Picture pic = new Picture(width, height);
+        for (int y = 0; y < height; y++)
+            for (int x = 0; x < width; x++) {
+                pic.setRGB(x, y, colorMatrix[x][y]);
+            }
+        return pic;
     }
 
     /**
@@ -37,7 +57,7 @@ public class SeamCarver {
      * @return
      */
     public int width() {
-        return picture.width();
+        return this.width;
     }
 
     /**
@@ -46,7 +66,7 @@ public class SeamCarver {
      * @return
      */
     public int height() {
-        return picture.height();
+        return this.height;
     }
 
     /**
@@ -65,10 +85,10 @@ public class SeamCarver {
 
         if (x == 0 || y == 0 || x == width()-1 || y == height()-1) energy[x][y] = 1000;
         else {
-            int colorX1 = picture.getRGB(x1, y);
-            int colorX2 = picture.getRGB(x2, y);
-            int colorY1 = picture.getRGB(x, y1);
-            int colorY2 = picture.getRGB(x, y2);
+            int colorX1 = colorMatrix[x1][y];
+            int colorX2 = colorMatrix[x2][y];
+            int colorY1 = colorMatrix[x][y1];
+            int colorY2 = colorMatrix[x][y2];
 
             int blueX1 = colorX1 & 0xff;
             int greenX1 = (colorX1 & 0xff00) >> 8;
@@ -109,8 +129,31 @@ public class SeamCarver {
      */
     public int[] findHorizontalSeam() {
 
+        energy = transposeMatrix(energy);
+        colorMatrix = transposeMatrix(colorMatrix);
 
-        throw new RuntimeException();
+        findVerticalSeam();
+
+        energy = transposeMatrix(energy);
+        colorMatrix = transposeMatrix(colorMatrix);
+
+        return edgeTo;
+    }
+
+    public static double[][] transposeMatrix(double [][] m){
+        double[][] temp = new double[m[0].length][m.length];
+        for (int i = 0; i < m.length; i++)
+            for (int j = 0; j < m[0].length; j++)
+                temp[j][i] = m[i][j];
+        return temp;
+    }
+
+    public static int[][] transposeMatrix(int [][] m){
+        int[][] temp = new int[m[0].length][m.length];
+        for (int i = 0; i < m.length; i++)
+            for (int j = 0; j < m[0].length; j++)
+                temp[j][i] = m[i][j];
+        return temp;
     }
 
     /**
@@ -121,7 +164,7 @@ public class SeamCarver {
     public int[] findVerticalSeam() {
         int size = width()*height();
         distTo = new double[size];
-        edgeTo = new int[size];
+        edgeTo = new int[height()];
 
         for (int v = 0; v < size; v++)
             distTo[v] = Double.POSITIVE_INFINITY;
@@ -133,7 +176,7 @@ public class SeamCarver {
                 relaxY(v, w);
         }
 
-        throw new RuntimeException();
+        return edgeTo;
     }
 
     /**
@@ -143,6 +186,7 @@ public class SeamCarver {
      */
     public void removeHorizontalSeam(int[] seam) {
         if (seam == null) throw new IllegalArgumentException("The horizontal seam does not have to be null");
+        height--;
         throw new RuntimeException();
     }
 
@@ -153,16 +197,28 @@ public class SeamCarver {
      */
     public void removeVerticalSeam(int[] seam) {
         if (seam == null) throw new IllegalArgumentException("The vertical seam does not have to be null");
-        throw new RuntimeException();
+        int x = 0;
+        for (int y : seam) {
+            System.arraycopy(energy[x], y+1, energy[x], y, width - y - 1);
+            System.arraycopy(colorMatrix[x], y+1, colorMatrix[x], y, width - y - 1);
+            energy[x][width-1] = 0;
+            x++;
+        }
+        x = 0;
+        for (int y : seam) {
+            energy(x, y);
+            x++;
+        }
+        width--;
     }
 
     // relax edge e
     private void relaxY(int v, int w) {
-        int y = w % width();
-        int x = w - 1 - (y * width());
-        if (distTo[w] > distTo[v] + energy[x][y]) {
-            distTo[w] = distTo[v] + energy[x][y];
-            edgeTo[y] = x;
+        int y2 = w % width();
+        int x2 = w - 1 - (y2 * width());
+        if (distTo[w] > distTo[v] + energy[x2][y2]) {
+            distTo[w] = distTo[v] + energy[x2][y2];
+            edgeTo[y2] = x2;
         }
     }
 
