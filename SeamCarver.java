@@ -1,13 +1,9 @@
-import edu.princeton.cs.algs4.DirectedEdge;
 import edu.princeton.cs.algs4.Picture;
 import edu.princeton.cs.algs4.Queue;
 
 public class SeamCarver {
 
-    private final Picture picture;
     private double[][] energy;
-    private Queue<Integer> order;     // vertices in topological order
-    private int[] ranks;
     private double[] distTo;
     private int[] edgeTo;
     private int width;
@@ -21,17 +17,16 @@ public class SeamCarver {
      */
     public SeamCarver(Picture picture) {
         if (picture == null) throw new IllegalArgumentException("The picture arg does not have to be null");
-        this.picture = picture;
-        this.width = picture.width();
-        this.height = picture.height();
-        this.energy = new double[this.width][this.height];
-        this.colorMatrix = new int[this.width][this.height];
+        width = picture.width();
+        height = picture.height();
+        energy = new double[width][height];
+        colorMatrix = new int[width][height];
 
-        for (int x=0; x<this.width-1; x++) {
-            for (int y=0; y<this.height-1; y++) {
+        for (int x = 0; x < width; x++) {
+            for (int y = 0; y < height; y++) {
                 colorMatrix[x][y] = picture.getRGB(x, y);
-                colorMatrix[x+1][y] = picture.getRGB(x+1, y);
-                colorMatrix[x][y+1] = picture.getRGB(x, y+1);
+                if (x+1 < width) colorMatrix[x+1][y] = picture.getRGB(x+1, y);
+                if (y+1 < height) colorMatrix[x][y+1] = picture.getRGB(x, y+1);
                 energy(x, y);
             }
         }
@@ -57,7 +52,7 @@ public class SeamCarver {
      * @return
      */
     public int width() {
-        return this.width;
+        return width;
     }
 
     /**
@@ -66,7 +61,7 @@ public class SeamCarver {
      * @return
      */
     public int height() {
-        return this.height;
+        return height;
     }
 
     /**
@@ -132,24 +127,19 @@ public class SeamCarver {
         energy = transposeMatrix(energy);
         colorMatrix = transposeMatrix(colorMatrix);
 
-        int originWidth = width;
-        int originHeight = height;
-
-        width = height;
-        height =  originWidth;
+        flipWH();
 
         findVerticalSeam();
 
         energy = transposeMatrix(energy);
         colorMatrix = transposeMatrix(colorMatrix);
 
-        width = height;
-        height = originHeight;
+        flipWH();
 
         return edgeTo;
     }
 
-    public static double[][] transposeMatrix(double [][] m){
+    private static double[][] transposeMatrix(double[][] m) {
         double[][] temp = new double[m[0].length][m.length];
         for (int i = 0; i < m.length; i++)
             for (int j = 0; j < m[0].length; j++)
@@ -157,7 +147,7 @@ public class SeamCarver {
         return temp;
     }
 
-    public static int[][] transposeMatrix(int [][] m){
+    private static int[][] transposeMatrix(int[][] m) {
         int[][] temp = new int[m[0].length][m.length];
         for (int i = 0; i < m.length; i++)
             for (int j = 0; j < m[0].length; j++)
@@ -172,11 +162,12 @@ public class SeamCarver {
      */
     public int[] findVerticalSeam() {
         int size = width()*height();
-        distTo = new double[size];
+        distTo = new double[size+2];
         edgeTo = new int[height()];
 
         for (int v = 0; v < size; v++)
             distTo[v] = Double.POSITIVE_INFINITY;
+        distTo[size] = 0;
 
         Iterable<Integer> topologicalY = calculateTopologicalY(size);
 
@@ -195,8 +186,23 @@ public class SeamCarver {
      */
     public void removeHorizontalSeam(int[] seam) {
         if (seam == null) throw new IllegalArgumentException("The horizontal seam does not have to be null");
-        height--;
-        throw new RuntimeException();
+        energy = transposeMatrix(energy);
+        colorMatrix = transposeMatrix(colorMatrix);
+
+        flipWH();
+
+        removeVerticalSeam(seam);
+
+        energy = transposeMatrix(energy);
+        colorMatrix = transposeMatrix(colorMatrix);
+
+        flipWH();
+    }
+
+    private void flipWH() {
+        width = height + width;
+        height = width - height;
+        width = width - height;
     }
 
     /**
@@ -223,58 +229,64 @@ public class SeamCarver {
 
     // relax edge e
     private void relaxY(int v, int w) {
-        int y2 = w % width();
-        int x2 = w - 1 - (y2 * width());
-        if (distTo[w] > distTo[v] + energy[x2][y2]) {
-            distTo[w] = distTo[v] + energy[x2][y2];
+        int y2 = w / width();
+        int x2 = w % width();
+        double e;
+        if (w >= height()*width()) {
+            e = 1000;
+        } else e = energy[x2][y2];
+        if (distTo[w] > distTo[v] + e) {
+            distTo[w] = distTo[v] + e;
             edgeTo[y2] = x2;
         }
     }
 
     private Iterable<Integer> calculateTopologicalY(int size) {
         // indegrees of remaining vertices
-        int[] indegree = new int[size];
+        int[] indegree = new int[size+2];
         for (int v = 0; v < size; v++) {
             indegree[v] = indegreeY(v);
         }
 
-        // initialize
-        ranks = new int[size];
-        order = new Queue<Integer>();
-        int count = 0;
+
+        // vertices in topological order
+        Queue<Integer> order = new Queue<Integer>();
 
         // initialize queue to contain all vertices with indegree = 0
         Queue<Integer> queue = new Queue<Integer>();
-        for (int v = 0; v < size; v++)
-            if (indegree[v] == 0) queue.enqueue(v);
+        queue.enqueue(-1);
 
         while (!queue.isEmpty()) {
             int v = queue.dequeue();
             order.enqueue(v);
-            ranks[v] = count++;
             for (int w : adjY(v)) {
                 indegree[w]--;
                 if (indegree[w] == 0) queue.enqueue(w);
             }
         }
-        return queue;
+        return order;
     }
 
     private int indegreeY(int node) {
-        int y = node % width();
-        int x = node - 1 - (y * width());
-        if (y == 0) return 0;
+        int y = node / width();
+        int x = node % width();
+        if (node == width()*height()) return 0;
+        if (node == width()*height()+1) return width();
+        if (y == 0) return 1;
         if (x == 0 || x == width()-1) return 2;
         return 3;
     }
 
     private int[] adjY(int node) {
-        int y = node % width();
-        int x = node - 1 - (y * width());
-
-        if (y == 0) return new int[0];
-        if (x == 0) return new int[]{node+width(), node+width()+1};
-        if (x == width()-1) return new int[]{node+width()-1, node+width()};
+        int y = node / width();
+        int x = node % width();
+        if (node == width()*height()) {
+            int[] res = new int[width()];
+            for (int i = 0; i < width(); i++) res[i] = i;
+        } else if (node == width()*height()+1) return new int[]{};
+        else if (y == height()-1) return new int[]{height()*width()+1};
+        else if (x == 0) return new int[]{node+width(), node+width()+1};
+        else if (x == width()-1) return new int[]{node+width()-1, node+width()};
         return new int[]{node+width()-1, node+width(), node+width()+1};
     }
 }
