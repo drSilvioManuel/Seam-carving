@@ -1,11 +1,12 @@
+
 import edu.princeton.cs.algs4.Picture;
 import edu.princeton.cs.algs4.Queue;
 
 public class SeamCarver {
 
     private double[][] energy;
-    private double[] distTo;
-    private int[] edgeTo;
+    private double[][] distTo;
+    private Indegree[][] edgeTo;
     private int width;
     private int height;
     private int [][] colorMatrix;
@@ -136,7 +137,7 @@ public class SeamCarver {
 
         flipWH();
 
-        return edgeTo;
+        return new int[]{};
     }
 
     private static double[][] transposeMatrix(double[][] m) {
@@ -162,21 +163,24 @@ public class SeamCarver {
      */
     public int[] findVerticalSeam() {
         int size = width()*height();
-        distTo = new double[size+2];
-        edgeTo = new int[height()];
+        distTo = new double[width()][height()];
+        edgeTo = new Indegree[width()][height()];
 
-        for (int v = 0; v < size; v++)
-            distTo[v] = Double.POSITIVE_INFINITY;
-        distTo[size] = 0;
+        for (int x = 0; x < width(); x++) {
+            for (int y = 0; y < height(); y++) {
+                if (x == 0) distTo[x][y] = 0;
+                else distTo[x][y] = Double.POSITIVE_INFINITY;
+            }
+        }
+        Indegree[][] indegree = new Indegree[width()][height()];
+        Iterable<Indegree> topologicalY = calculateTopologicalY(indegree);
 
-        Iterable<Integer> topologicalY = calculateTopologicalY(size);
-
-        for (int v : topologicalY) {
-            for (int w : adjY(v))
+        for (Indegree v : topologicalY) {
+            for (Indegree w : adjY(v, indegree))
                 relaxY(v, w);
         }
 
-        return edgeTo;
+        return new int[]{};
     }
 
     /**
@@ -228,65 +232,66 @@ public class SeamCarver {
     }
 
     // relax edge e
-    private void relaxY(int v, int w) {
-        int y2 = w / width();
-        int x2 = w % width();
-        double e;
-        if (w >= height()*width()) {
-            e = 1000;
-        } else e = energy[x2][y2];
-        if (distTo[w] > distTo[v] + e) {
-            distTo[w] = distTo[v] + e;
-            edgeTo[y2] = x2;
+    private void relaxY(Indegree v, Indegree w) {
+        int y2 = w.y;
+        int x2 = w.x;
+        double e = energy[w.x][w.y];
+        if (distTo[w.x][w.y] > distTo[v.x][v.y] + e) {
+            distTo[w.x][w.y] = distTo[v.x][v.y] + e;
+            edgeTo[w.x][w.y] = v;
         }
     }
 
-    private Iterable<Integer> calculateTopologicalY(int size) {
+    private Iterable<Indegree> calculateTopologicalY(Indegree[][] indegree) {
         // indegrees of remaining vertices
-        int[] indegree = new int[size+2];
-        for (int v = 0; v < size; v++) {
-            indegree[v] = indegreeY(v);
+        Queue<Indegree> queue = new Queue<Indegree>();
+        for (int x = 0; x < width(); x++) {
+            for (int y = 0; y < height(); y++) {
+                int indegreeY = indegreeY(x, y);
+                indegree[x][y] = new Indegree(x, y, indegreeY);
+                if (indegreeY == 0) queue.enqueue(indegree[x][y]);
+            }
         }
 
-
         // vertices in topological order
-        Queue<Integer> order = new Queue<Integer>();
-
-        // initialize queue to contain all vertices with indegree = 0
-        Queue<Integer> queue = new Queue<Integer>();
-        queue.enqueue(-1);
+        Queue<Indegree> order = new Queue<Indegree>();
 
         while (!queue.isEmpty()) {
-            int v = queue.dequeue();
+            Indegree v = queue.dequeue();
             order.enqueue(v);
-            for (int w : adjY(v)) {
-                indegree[w]--;
-                if (indegree[w] == 0) queue.enqueue(w);
+            for (Indegree w : adjY(v, indegree)) {
+                w.indegree--;
+                if (w.indegree == 0) queue.enqueue(w);
             }
         }
         return order;
     }
 
-    private int indegreeY(int node) {
-        int y = node / width();
-        int x = node % width();
-        if (node == width()*height()) return 0;
-        if (node == width()*height()+1) return width();
-        if (y == 0) return 1;
-        if (x == 0 || x == width()-1) return 2;
+    private int indegreeY(int x, int y) {
+        if (x == 0) return 0;
+        if (y == 0 || y == width()-1) return 2;
         return 3;
     }
 
-    private int[] adjY(int node) {
-        int y = node / width();
-        int x = node % width();
-        if (node == width()*height()) {
-            int[] res = new int[width()];
-            for (int i = 0; i < width(); i++) res[i] = i;
-        } else if (node == width()*height()+1) return new int[]{};
-        else if (y == height()-1) return new int[]{height()*width()+1};
-        else if (x == 0) return new int[]{node+width(), node+width()+1};
-        else if (x == width()-1) return new int[]{node+width()-1, node+width()};
-        return new int[]{node+width()-1, node+width(), node+width()+1};
+    private Indegree[] adjY(Indegree indegree, Indegree[][] indegrees) {
+        int x = indegree.x;
+        int y = indegree.y;
+
+        if (y == height()-1) return new Indegree[]{indegrees[x+1][y-1], indegrees[x+1][y]};
+        else if (y == 0) return new Indegree[]{indegrees[x+1][y], indegrees[x+1][y+1]};
+        return new Indegree[]{indegrees[x+1][y-1], indegrees[x+1][y], indegrees[x+1][y+1]};
+    }
+
+    private static class Indegree {
+        final int x;
+        final int y;
+        int indegree;
+
+        Indegree(int x0, int y0, int indegree0) {
+            x = x0;
+            y = y0;
+            indegree = indegree0;
+        }
+
     }
 }
