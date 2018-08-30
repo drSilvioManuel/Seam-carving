@@ -1,15 +1,17 @@
-
+import edu.princeton.cs.algs4.MinPQ;
 import edu.princeton.cs.algs4.Picture;
 import edu.princeton.cs.algs4.Queue;
 
+import java.util.HashMap;
+import java.util.Map;
+
 public class SeamCarver {
 
+    private int [][] colorMatrix;
     private double[][] energy;
     private double[][] distTo;
-    private Indegree[][] edgeTo;
     private int width;
     private int height;
-    private int [][] colorMatrix;
 
     /**
      * create a seam carver object based on the given picture
@@ -20,15 +22,15 @@ public class SeamCarver {
         if (picture == null) throw new IllegalArgumentException("The picture arg does not have to be null");
         width = picture.width();
         height = picture.height();
-        energy = new double[width][height];
-        colorMatrix = new int[width][height];
+        energy = new double[height][width];
+        colorMatrix = new int[height][width];
 
-        for (int x = 0; x < width; x++) {
-            for (int y = 0; y < height; y++) {
-                colorMatrix[x][y] = picture.getRGB(x, y);
-                if (x+1 < width) colorMatrix[x+1][y] = picture.getRGB(x+1, y);
-                if (y+1 < height) colorMatrix[x][y+1] = picture.getRGB(x, y+1);
-                energy(x, y);
+        for (int row = 0; row < height; row++) {
+            for (int col = 0; col < width; col++) {
+                colorMatrix[row][col] = picture.getRGB(col, row);
+                if (col+1 < width) colorMatrix[row][col+1] = picture.getRGB(col+1, row);
+                if (row+1 < height) colorMatrix[row+1][col] = picture.getRGB(col, row+1);
+                energy[row][col] = energy(col, row);
             }
         }
     }
@@ -40,9 +42,9 @@ public class SeamCarver {
      */
     public Picture picture() {
         Picture pic = new Picture(width, height);
-        for (int y = 0; y < height; y++)
-            for (int x = 0; x < width; x++) {
-                pic.setRGB(x, y, colorMatrix[x][y]);
+        for (int row = 0; row < height; row++)
+            for (int col = 0; col < width; col++) {
+                pic.setRGB(col, row, colorMatrix[row][col]);
             }
         return pic;
     }
@@ -66,25 +68,27 @@ public class SeamCarver {
     }
 
     /**
-     * energy of pixel at column x and row y
+     * energy of pixel at column row and row col
      * 
      * @param x
      * @param y
      * @return
      */
     public double energy(int x, int y) {
-        if (x < 0 || y < 0 || x > width()-1 || y > height()-1) throw new IllegalArgumentException("Wrong x y coordinates");
-        int x1 = x - 1;
-        int x2 = x + 1;
-        int y1 = y - 1;
-        int y2 = y + 1;
+        if (x < 0 || y < 0 || x > width()-1 || y > height()-1) throw new IllegalArgumentException("Wrong row col coordinates");
 
-        if (x == 0 || y == 0 || x == width()-1 || y == height()-1) energy[x][y] = 1000;
+        if (x == 0 || y == 0 || x == width()-1 || y == height()-1) return 1000;
         else {
-            int colorX1 = colorMatrix[x1][y];
-            int colorX2 = colorMatrix[x2][y];
-            int colorY1 = colorMatrix[x][y1];
-            int colorY2 = colorMatrix[x][y2];
+
+            int x1 = x - 1;
+            int x2 = x + 1;
+            int y1 = y - 1;
+            int y2 = y + 1;
+
+            int colorX1 = colorMatrix[y][x1];
+            int colorX2 = colorMatrix[y][x2];
+            int colorY1 = colorMatrix[y1][x];
+            int colorY2 = colorMatrix[y2][x];
 
             int blueX1 = colorX1 & 0xff;
             int greenX1 = (colorX1 & 0xff00) >> 8;
@@ -113,9 +117,8 @@ public class SeamCarver {
             double dx = bx*bx + gx*gx + rx*rx;
             double dy = by*by + gy*gy + ry*ry;
 
-            energy[x][y] = Math.sqrt(dx + dy);
+            return Math.sqrt(dx + dy);
         }
-        return energy[x][y];
     }
 
     /**
@@ -130,14 +133,14 @@ public class SeamCarver {
 
         flipWH();
 
-        findVerticalSeam();
+        int[] res = findVerticalSeam();
 
         energy = transposeMatrix(energy);
         colorMatrix = transposeMatrix(colorMatrix);
 
         flipWH();
 
-        return new int[]{};
+        return res;
     }
 
     private static double[][] transposeMatrix(double[][] m) {
@@ -162,25 +165,25 @@ public class SeamCarver {
      * @return
      */
     public int[] findVerticalSeam() {
-        int size = width()*height();
-        distTo = new double[width()][height()];
-        edgeTo = new Indegree[width()][height()];
+        int rows = height();
+        int cols = width();
+        distTo = new double[rows][cols];
 
-        for (int x = 0; x < width(); x++) {
-            for (int y = 0; y < height(); y++) {
-                if (x == 0) distTo[x][y] = 0;
-                else distTo[x][y] = Double.POSITIVE_INFINITY;
+        for (int row = 0; row < rows; row++) {
+            for (int col = 0; col < cols; col++) {
+                if (row == 0) distTo[row][col] = 0;
+                else distTo[row][col] = Double.POSITIVE_INFINITY;
             }
         }
-        Indegree[][] indegree = new Indegree[width()][height()];
-        Iterable<Indegree> topologicalY = calculateTopologicalY(indegree);
-
-        for (Indegree v : topologicalY) {
-            for (Indegree w : adjY(v, indegree))
-                relaxY(v, w);
+        Node[][] nodes = new Node[rows][cols];
+        Iterable<Node> topologicalY = calculateTopologicalY(nodes);
+        SemiGraph graph = new SemiGraph();
+        for (Node v : topologicalY) {
+            for (Node w : adjY(v, nodes))
+                relaxY(v, w, graph);
         }
 
-        return new int[]{};
+        return graph.getChain(rows);
     }
 
     /**
@@ -218,48 +221,47 @@ public class SeamCarver {
         if (seam == null) throw new IllegalArgumentException("The vertical seam does not have to be null");
         int x = 0;
         for (int y : seam) {
-            System.arraycopy(energy[x], y+1, energy[x], y, width - y - 1);
-            System.arraycopy(colorMatrix[x], y+1, colorMatrix[x], y, width - y - 1);
+            System.arraycopy(energy[y], x+1, energy[y], x, width - x - 1);
+            System.arraycopy(colorMatrix[y], x+1, colorMatrix[y], x, width - x - 1);
             energy[x][width-1] = 0;
             x++;
         }
         x = 0;
         for (int y : seam) {
-            energy(x, y);
+            energy[y][x] = energy(x, y);
             x++;
         }
         width--;
     }
 
     // relax edge e
-    private void relaxY(Indegree v, Indegree w) {
-        int y2 = w.y;
-        int x2 = w.x;
-        double e = energy[w.x][w.y];
-        if (distTo[w.x][w.y] > distTo[v.x][v.y] + e) {
-            distTo[w.x][w.y] = distTo[v.x][v.y] + e;
-            edgeTo[w.x][w.y] = v;
+    private void relaxY(Node v, Node w, SemiGraph graph) {
+
+        double e = energy[w.row][w.col];
+        if (distTo[w.row][w.col] > distTo[v.row][v.col] + e) {
+            distTo[w.row][w.col] = distTo[v.row][v.col] + e;
+            graph.addEdge(v, w, distTo[v.row][v.col] + e);
         }
     }
 
-    private Iterable<Indegree> calculateTopologicalY(Indegree[][] indegree) {
+    private Iterable<Node> calculateTopologicalY(Node[][] nodes) {
         // indegrees of remaining vertices
-        Queue<Indegree> queue = new Queue<Indegree>();
-        for (int x = 0; x < width(); x++) {
-            for (int y = 0; y < height(); y++) {
-                int indegreeY = indegreeY(x, y);
-                indegree[x][y] = new Indegree(x, y, indegreeY);
-                if (indegreeY == 0) queue.enqueue(indegree[x][y]);
+        Queue<Node> queue = new Queue<Node>();
+        for (int row = 0; row < height(); row++) {
+            for (int col = 0; col < width(); col++) {
+                int indegreeY = indegreeY(row, col);
+                nodes[row][col] = new Node(row, col, indegreeY);
+                if (indegreeY == 0) queue.enqueue(nodes[row][col]);
             }
         }
 
         // vertices in topological order
-        Queue<Indegree> order = new Queue<Indegree>();
+        Queue<Node> order = new Queue<Node>();
 
         while (!queue.isEmpty()) {
-            Indegree v = queue.dequeue();
+            Node v = queue.dequeue();
             order.enqueue(v);
-            for (Indegree w : adjY(v, indegree)) {
+            for (Node w : adjY(v, nodes)) {
                 w.indegree--;
                 if (w.indegree == 0) queue.enqueue(w);
             }
@@ -267,31 +269,92 @@ public class SeamCarver {
         return order;
     }
 
-    private int indegreeY(int x, int y) {
-        if (x == 0) return 0;
-        if (y == 0 || y == width()-1) return 2;
-        return 3;
+    private int indegreeY(int row, int col) {
+        if (row == 0) return 0;
+        else if (col == 0 || col == width()-1) return 2;
+        else return 3;
     }
 
-    private Indegree[] adjY(Indegree indegree, Indegree[][] indegrees) {
-        int x = indegree.x;
-        int y = indegree.y;
-
-        if (y == height()-1) return new Indegree[]{indegrees[x+1][y-1], indegrees[x+1][y]};
-        else if (y == 0) return new Indegree[]{indegrees[x+1][y], indegrees[x+1][y+1]};
-        return new Indegree[]{indegrees[x+1][y-1], indegrees[x+1][y], indegrees[x+1][y+1]};
+    private Node[] adjY(Node node, Node[][] nodes) {
+        int row = node.row;
+        int col = node.col;
+        if (row == height()-1) return new Node[]{};
+        else if (col == width()-1) return new Node[]{nodes[row+1][col-1], nodes[row+1][col]};
+        else if (col == 0) return new Node[]{nodes[row+1][col], nodes[row+1][col+1]};
+        return new Node[]{nodes[row+1][col-1], nodes[row+1][col], nodes[row+1][col+1]};
     }
 
-    private static class Indegree {
-        final int x;
-        final int y;
+    private static class Node {
+        final int row;
+        final int col;
         int indegree;
+        Node from;
 
-        Indegree(int x0, int y0, int indegree0) {
-            x = x0;
-            y = y0;
+        Node(int r, int c, int indegree0) {
+            row = r;
+            col = c;
             indegree = indegree0;
         }
 
+        @Override
+        public String toString() {
+            return String.format("Node(row %d, col %d, indegree %d)", row, col, indegree);
+        }
+
+        @Override
+        public int hashCode() {
+            int result = 17;
+            result = 31 * result + row;
+            result = 31 * result + col;
+            return result;
+        }
+
+        @Override
+        public boolean equals(Object obj) {
+            boolean result = false;
+            if (obj == null || obj.getClass() != getClass()) {
+                result = false;
+            } else {
+                Node person = (Node) obj;
+                if (this.row == person.row && this.col == person.col) {
+                    result = true;
+                }
+            }
+            return result;
+        }
+    }
+
+    private static class SemiGraph {
+
+        Map<Node, MinPQ<Node>> map = new HashMap<>();
+        MinPQ<Node> lastNodes;
+
+
+        void addEdge(Node from, Node to, double weight) {
+            MinPQ<Node> pq = map.get(to);
+            if (pq == null) {
+                pq = new MinPQ<>((o1, o2) -> o1.indegree - o2.indegree);
+                map.put(to, pq);
+            }
+            from.indegree = (int) weight;
+            from.from = to;
+            pq.insert(from);
+            lastNodes = pq;
+        }
+
+        int[] getChain(int size) {
+            int[] res = new int[size];
+            Node root = lastNodes.delMin();
+            int i = 0;
+            res[i++] = root.from.col;
+            res[i++] = root.col;
+            Node next;
+            while ((next = map.get(root).delMin()) != null) {
+                res[i++] = next.col;
+                root = next;
+                if (map.get(root) == null) break;
+            }
+            return res;
+        }
     }
 }
