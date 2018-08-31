@@ -1,8 +1,5 @@
-import edu.princeton.cs.algs4.MinPQ;
 import edu.princeton.cs.algs4.Picture;
 import edu.princeton.cs.algs4.Queue;
-
-import java.util.HashMap;
 
 public class SeamCarver {
 
@@ -10,6 +7,7 @@ public class SeamCarver {
     private static final int GREEN = 0xff00;
     private static final int RED = 0xff0000;
     private static final int MIN_ACCEPTABLE_CELLS = 3;
+    private Node lastNode;
     private int [][] colorMatrix;
     private double[][] energy;
     private double[][] distTo;
@@ -183,13 +181,16 @@ public class SeamCarver {
         }
         Node[][] nodes = new Node[rows][cols];
         Iterable<Node> topologicalY = calculateTopologicalY(nodes);
-        SemiGraph graph = new SemiGraph(rows, cols);
         for (Node v : topologicalY) {
             for (Node w : adjY(v, nodes))
-                relaxY(v, w, graph);
+                relaxY(v, w);
+        }
+        int[] seam = new int[height()];
+        for (Node current = lastNode; current != null; current = adjReverce(current, nodes)) {
+            seam[current.row] = current.col;
         }
 
-        return graph.getChain(rows);
+        return seam;
     }
 
     /**
@@ -247,12 +248,17 @@ public class SeamCarver {
     }
 
     // relax edge e
-    private void relaxY(Node v, Node w, SemiGraph graph) {
+    private void relaxY(Node v, Node w) {
 
         double e = energy[w.row][w.col];
-        if (distTo[w.row][w.col] > distTo[v.row][v.col] + e) {
-            distTo[w.row][w.col] = distTo[v.row][v.col] + e;
-            graph.addEdge(v, w, distTo[v.row][v.col] + e);
+        double power = distTo[v.row][v.col] + e;
+        if (distTo[w.row][w.col] > power) {
+            distTo[w.row][w.col] = power;
+            w.power = power;
+            if (w.row == height()-1) {
+                if (lastNode == null) lastNode = w;
+                else if (w.power < lastNode.power) lastNode = w;
+            }
         }
     }
 
@@ -296,9 +302,23 @@ public class SeamCarver {
         return new Node[]{nodes[row+1][col-1], nodes[row+1][col], nodes[row+1][col+1]};
     }
 
+    private Node adjReverce(Node node, Node[][] nodes) {
+        int row = node.row;
+        int col = node.col;
+        if (row == 0) return null;
+        else if (col == width()-1) return nodes[row-1][col-1].power > nodes[row-1][col].power ? nodes[row-1][col] : nodes[row-1][col-1];
+        else if (col == 0) return nodes[row-1][col].power > nodes[row-1][col+1].power ? nodes[row-1][col+1] : nodes[row-1][col];
+
+        Node a = nodes[row-1][col-1];
+        Node b = nodes[row-1][col];
+        Node c = nodes[row-1][col+1];
+        if (a.power <= b.power && a.power <= c.power) return a;
+        else if (b.power <= a.power && b.power <= c.power) return b;
+        else return c;
+    }
+
     private static class Node {
-        private static final int INIT_HASH = 17;
-        private static final int FOLLOW_HASH = 31;
+
         private final int row;
         private final int col;
         private int indegree;
@@ -313,73 +333,6 @@ public class SeamCarver {
         @Override
         public String toString() {
             return String.format("Node(row %d, col %d, indegree %d)", row, col, indegree);
-        }
-
-        @Override
-        public int hashCode() {
-            int result = INIT_HASH;
-            result = FOLLOW_HASH * result + row;
-            result = FOLLOW_HASH * result + col;
-            return result;
-        }
-
-        @Override
-        public boolean equals(Object obj) {
-            boolean result = false;
-            if (obj == null || obj.getClass() != getClass()) {
-                result = false;
-            } else {
-                Node person = (Node) obj;
-                if (this.row == person.row && this.col == person.col) {
-                    result = true;
-                }
-            }
-            return result;
-        }
-    }
-
-    private static class SemiGraph {
-
-        private final HashMap<Node, MinPQ<Node>> map = new HashMap<>();
-        private Node lastNode;
-        private final int row;
-        private final int col;
-
-        SemiGraph(int r, int c) {
-            row = r;
-            col = c;
-        }
-
-
-        void addEdge(Node from, Node to, double weight) {
-            MinPQ<Node> pq = map.get(to);
-            if (pq == null) {
-                pq = new MinPQ<>(3, (o1, o2) -> {
-                    double res = o1.power - o2.power;
-                    if (res > 0) return 1;
-                    else if (res < 0) return -1;
-                    else return 0;
-                });
-                map.put(to, pq);
-            }
-            from.power = weight;
-            pq.insert(from);
-            if (to.row == row-1) {
-                if (lastNode == null) lastNode = from;
-                else if (from.power < lastNode.power) lastNode = from;
-            }
-        }
-
-        int[] getChain(int size) {
-            int[] res = new int[size];
-            int i = size;
-            res[--i] = 0;
-            for (Node next = lastNode; next != null && map.get(next) != null; next = map.get(next).delMin()) {
-                res[--i] = next.col;
-            }
-            res[size-1] = res[size-2]; // last elements have same power, so assigh as prev
-            res[0] = res[1]; // first elements have same power, so assigh as next
-            return res;
         }
     }
 }
