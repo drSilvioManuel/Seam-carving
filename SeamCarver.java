@@ -285,10 +285,9 @@ public class SeamCarver {
     }
 
     private static class Node {
-        final int row;
-        final int col;
-        int indegree;
-        Node from;
+        private final int row;
+        private final int col;
+        private int indegree;
 
         Node(int r, int c, int indegree0) {
             row = r;
@@ -326,8 +325,8 @@ public class SeamCarver {
 
     private static class SemiGraph {
 
-        Map<Node, MinPQ<Node>> map = new HashMap<>();
-        MinPQ<Node> lastNodes;
+        private Map<Node, MinPQ<Node>> map = new HashMap<>();
+        private MinPQ<Node> lastNodes;
 
 
         void addEdge(Node from, Node to, double weight) {
@@ -337,23 +336,19 @@ public class SeamCarver {
                 map.put(to, pq);
             }
             from.indegree = (int) weight;
-            from.from = to;
             pq.insert(from);
             lastNodes = pq;
         }
 
         int[] getChain(int size) {
             int[] res = new int[size];
-            Node root = lastNodes.delMin();
-            int i = 0;
-            res[i++] = root.from.col;
-            res[i++] = root.col;
-            Node next;
-            while ((next = map.get(root).delMin()) != null) {
-                res[i++] = next.col;
-                root = next;
-                if (map.get(root) == null) break;
+            int i = size;
+            res[--i] = 0;
+            for (Node next = lastNodes.delMin(); next != null && map.get(next) != null; next = map.get(next).delMin()) {
+                res[--i] = next.col;
             }
+            res[size-1] = res[size-2]; // last elements have same power, so assigh as prev
+            res[0] = res[1]; // first elements have same power, so assigh as next
             return res;
         }
     }
