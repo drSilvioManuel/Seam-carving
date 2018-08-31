@@ -177,7 +177,7 @@ public class SeamCarver {
         }
         Node[][] nodes = new Node[rows][cols];
         Iterable<Node> topologicalY = calculateTopologicalY(nodes);
-        SemiGraph graph = new SemiGraph();
+        SemiGraph graph = new SemiGraph(rows, cols);
         for (Node v : topologicalY) {
             for (Node w : adjY(v, nodes))
                 relaxY(v, w, graph);
@@ -288,6 +288,7 @@ public class SeamCarver {
         private final int row;
         private final int col;
         private int indegree;
+        private double power;
 
         Node(int r, int c, int indegree0) {
             row = r;
@@ -327,17 +328,37 @@ public class SeamCarver {
 
         private Map<Node, MinPQ<Node>> map = new HashMap<>();
         private MinPQ<Node> lastNodes;
+        private int row;
+        private int col;
+
+        SemiGraph(int r, int c) {
+            row = r;
+            col = c;
+        }
 
 
         void addEdge(Node from, Node to, double weight) {
             MinPQ<Node> pq = map.get(to);
             if (pq == null) {
-                pq = new MinPQ<>((o1, o2) -> o1.indegree - o2.indegree);
+                pq = new MinPQ<>(3, (o1, o2) -> {
+                    double res = o1.power - o2.power;
+                    if (res > 0) return 1;
+                    else if (res < 0) return -1;
+                    else return 0;
+                });
                 map.put(to, pq);
             }
-            from.indegree = (int) weight;
+            from.power = weight;
             pq.insert(from);
-            lastNodes = pq;
+            if (to.row == row -1) {
+                if (lastNodes == null) lastNodes = new MinPQ<>(col, (o1, o2) -> {
+                    double res = o1.power - o2.power;
+                    if (res > 0) return 1;
+                    else if (res < 0) return -1;
+                    else return 0;
+                });
+                lastNodes.insert(from);
+            }
         }
 
         int[] getChain(int size) {
