@@ -230,18 +230,20 @@ public class SeamCarver {
         double[][] copyEnergy = new double[height()][width() - 1];
 
         for (int row = 0; row < height(); row++) {
+
             System.arraycopy(colorMatrix[row], 0, copyColor[row], 0, seam[row]);
-            System.arraycopy(colorMatrix[row], seam[row] + 1, copyColor[row], seam[row], height - seam[row] - 1);
+            System.arraycopy(colorMatrix[row], seam[row] + 1, copyColor[row], seam[row], width() - seam[row] - 1);
 
             System.arraycopy(energy[row], 0, copyEnergy[row], 0, seam[row]);
-            System.arraycopy(energy[row], seam[row] + 1, copyEnergy[row], seam[row], height - seam[row] - 1);
+            System.arraycopy(energy[row], seam[row] + 1, copyEnergy[row], seam[row], width() - seam[row] - 1);
         }
         colorMatrix = copyColor;
         energy = copyEnergy;
 
+        width--;
+
         for (int row = 0; row < height(); row++) energy[row][seam[row]] = energy(seam[row], row);
 
-        width--;
     }
 
     // relax edge e
