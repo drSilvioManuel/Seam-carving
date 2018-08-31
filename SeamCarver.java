@@ -6,10 +6,10 @@ import java.util.HashMap;
 
 public class SeamCarver {
 
-    public static final int BLUE = 0xff;
-    public static final int GREEN = 0xff00;
-    public static final int RED = 0xff0000;
-    public static final int MIN_ACCEPTABLE_CELLS = 3;
+    private static final int BLUE = 0xff;
+    private static final int GREEN = 0xff00;
+    private static final int RED = 0xff0000;
+    private static final int MIN_ACCEPTABLE_CELLS = 3;
     private int [][] colorMatrix;
     private double[][] energy;
     private double[][] distTo;
@@ -295,8 +295,8 @@ public class SeamCarver {
     }
 
     private static class Node {
-        public static final int INIT_HASH = 17;
-        public static final int FOLLOW_HASH = 31;
+        private static final int INIT_HASH = 17;
+        private static final int FOLLOW_HASH = 31;
         private final int row;
         private final int col;
         private int indegree;
