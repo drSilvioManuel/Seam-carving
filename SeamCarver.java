@@ -169,7 +169,12 @@ public class SeamCarver {
         int rows = height();
         int cols = width();
 
-        if (cols < MIN_ACCEPTABLE_CELLS || rows < MIN_ACCEPTABLE_CELLS) return new int[]{};
+        if (cols < MIN_ACCEPTABLE_CELLS || rows < MIN_ACCEPTABLE_CELLS) {
+            int[] seam = new int[rows];
+            for (int i = 0; i < rows; i++) seam[i] = 0;
+
+            return seam;
+        }
 
         distTo = new double[rows][cols];
 
