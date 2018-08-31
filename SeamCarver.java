@@ -3,10 +3,13 @@ import edu.princeton.cs.algs4.Picture;
 import edu.princeton.cs.algs4.Queue;
 
 import java.util.HashMap;
-import java.util.Map;
 
 public class SeamCarver {
 
+    public static final int BLUE = 0xff;
+    public static final int GREEN = 0xff00;
+    public static final int RED = 0xff0000;
+    public static final int MIN_ACCEPTABLE_CELLS = 3;
     private int [][] colorMatrix;
     private double[][] energy;
     private double[][] distTo;
@@ -90,21 +93,21 @@ public class SeamCarver {
             int colorY1 = colorMatrix[y1][x];
             int colorY2 = colorMatrix[y2][x];
 
-            int blueX1 = colorX1 & 0xff;
-            int greenX1 = (colorX1 & 0xff00) >> 8;
-            int redX1 = (colorX1 & 0xff0000) >> 16;
+            int blueX1 = colorX1 & BLUE;
+            int greenX1 = (colorX1 & GREEN) >> 8;
+            int redX1 = (colorX1 & RED) >> 16;
 
-            int blueX2 = colorX2 & 0xff;
-            int greenX2 = (colorX2 & 0xff00) >> 8;
-            int redX2 = (colorX2 & 0xff0000) >> 16;
+            int blueX2 = colorX2 & BLUE;
+            int greenX2 = (colorX2 & GREEN) >> 8;
+            int redX2 = (colorX2 & RED) >> 16;
 
-            int blueY1 = colorY1 & 0xff;
-            int greenY1 = (colorY1 & 0xff00) >> 8;
-            int redY1 = (colorY1 & 0xff0000) >> 16;
+            int blueY1 = colorY1 & BLUE;
+            int greenY1 = (colorY1 & GREEN) >> 8;
+            int redY1 = (colorY1 & RED) >> 16;
 
-            int blueY2 = colorY2 & 0xff;
-            int greenY2 = (colorY2 & 0xff00) >> 8;
-            int redY2 = (colorY2 & 0xff0000) >> 16;
+            int blueY2 = colorY2 & BLUE;
+            int greenY2 = (colorY2 & GREEN) >> 8;
+            int redY2 = (colorY2 & RED) >> 16;
 
             int bx = blueX2 - blueX1;
             int gx = greenX2 - greenX1;
@@ -167,6 +170,9 @@ public class SeamCarver {
     public int[] findVerticalSeam() {
         int rows = height();
         int cols = width();
+
+        if (cols < MIN_ACCEPTABLE_CELLS || rows < MIN_ACCEPTABLE_CELLS) return new int[]{};
+
         distTo = new double[rows][cols];
 
         for (int row = 0; row < rows; row++) {
@@ -219,18 +225,22 @@ public class SeamCarver {
      */
     public void removeVerticalSeam(int[] seam) {
         if (seam == null) throw new IllegalArgumentException("The vertical seam does not have to be null");
-        int x = 0;
-        for (int y : seam) {
-            System.arraycopy(energy[y], x+1, energy[y], x, width - x - 1);
-            System.arraycopy(colorMatrix[y], x+1, colorMatrix[y], x, width - x - 1);
-            energy[x][width-1] = 0;
-            x++;
+
+        int[][] copyColor = new int[height()][width() - 1];
+        double[][] copyEnergy = new double[height()][width() - 1];
+
+        for (int row = 0; row < height(); row++) {
+            System.arraycopy(colorMatrix[row], 0, copyColor[row], 0, seam[row]);
+            System.arraycopy(colorMatrix[row], seam[row] + 1, copyColor[row], seam[row], height - seam[row] - 1);
+
+            System.arraycopy(energy[row], 0, copyEnergy[row], 0, seam[row]);
+            System.arraycopy(energy[row], seam[row] + 1, copyEnergy[row], seam[row], height - seam[row] - 1);
         }
-        x = 0;
-        for (int y : seam) {
-            energy[y][x] = energy(x, y);
-            x++;
-        }
+        colorMatrix = copyColor;
+        energy = copyEnergy;
+
+        for (int row = 0; row < height(); row++) energy[row][seam[row]] = energy(seam[row], row);
+
         width--;
     }
 
@@ -285,6 +295,8 @@ public class SeamCarver {
     }
 
     private static class Node {
+        public static final int INIT_HASH = 17;
+        public static final int FOLLOW_HASH = 31;
         private final int row;
         private final int col;
         private int indegree;
@@ -303,9 +315,9 @@ public class SeamCarver {
 
         @Override
         public int hashCode() {
-            int result = 17;
-            result = 31 * result + row;
-            result = 31 * result + col;
+            int result = INIT_HASH;
+            result = FOLLOW_HASH * result + row;
+            result = FOLLOW_HASH * result + col;
             return result;
         }
 
@@ -326,10 +338,10 @@ public class SeamCarver {
 
     private static class SemiGraph {
 
-        private Map<Node, MinPQ<Node>> map = new HashMap<>();
-        private MinPQ<Node> lastNodes;
-        private int row;
-        private int col;
+        private final HashMap<Node, MinPQ<Node>> map = new HashMap<>();
+        private Node lastNode;
+        private final int row;
+        private final int col;
 
         SemiGraph(int r, int c) {
             row = r;
@@ -350,14 +362,9 @@ public class SeamCarver {
             }
             from.power = weight;
             pq.insert(from);
-            if (to.row == row -1) {
-                if (lastNodes == null) lastNodes = new MinPQ<>(col, (o1, o2) -> {
-                    double res = o1.power - o2.power;
-                    if (res > 0) return 1;
-                    else if (res < 0) return -1;
-                    else return 0;
-                });
-                lastNodes.insert(from);
+            if (to.row == row-1) {
+                if (lastNode == null) lastNode = from;
+                else if (from.power < lastNode.power) lastNode = from;
             }
         }
 
@@ -365,7 +372,7 @@ public class SeamCarver {
             int[] res = new int[size];
             int i = size;
             res[--i] = 0;
-            for (Node next = lastNodes.delMin(); next != null && map.get(next) != null; next = map.get(next).delMin()) {
+            for (Node next = lastNode; next != null && map.get(next) != null; next = map.get(next).delMin()) {
                 res[--i] = next.col;
             }
             res[size-1] = res[size-2]; // last elements have same power, so assigh as prev
