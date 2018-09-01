@@ -76,7 +76,8 @@ public class SeamCarver {
      * @return
      */
     public double energy(int x, int y) {
-        if (x < 0 || y < 0 || x > width()-1 || y > height()-1) throw new IllegalArgumentException("Wrong row col coordinates");
+        if (x < 0 || y < 0 || x > width()-1 || y > height()-1)
+            throw new IllegalArgumentException(String.format("Wrong row [%d] col [%d] coordinates size: %d x %d", y, x, width(), height()));
 
         if (x == 0 || y == 0 || x == width()-1 || y == height()-1) return 1000;
         else {
@@ -231,11 +232,15 @@ public class SeamCarver {
      */
     public void removeVerticalSeam(int[] seam) {
         if (seam == null) throw new IllegalArgumentException("The vertical seam does not have to be null");
+        if (seam.length > height()) throw new IllegalArgumentException("The vertical seam does not have to be bigger than height");
 
         int[][] copyColor = new int[height()][width() - 1];
         double[][] copyEnergy = new double[height()][width() - 1];
 
         for (int row = 0; row < height(); row++) {
+
+            if (seam[row] < 0 || seam[row] > width()-1)
+                throw new IllegalArgumentException(String.format("The seam is illegal: seam[row] = %d, but width is %d", seam[row], width()));
 
             System.arraycopy(colorMatrix[row], 0, copyColor[row], 0, seam[row]);
             System.arraycopy(colorMatrix[row], seam[row] + 1, copyColor[row], seam[row], width() - seam[row] - 1);
