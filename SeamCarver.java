@@ -241,6 +241,9 @@ public class SeamCarver {
 
             if (seam[row] < 0 || seam[row] > width()-1)
                 throw new IllegalArgumentException(String.format("The seam is illegal: seam[row] = %d, but width is %d", seam[row], width()));
+            if (row > 0) {
+                if (Math.abs(seam[row] - seam[row-1]) > 1) throw new IllegalArgumentException("The vertical seam does not have shift between of cells more than 1");
+            }
 
             System.arraycopy(colorMatrix[row], 0, copyColor[row], 0, seam[row]);
             System.arraycopy(colorMatrix[row], seam[row] + 1, copyColor[row], seam[row], width() - seam[row] - 1);
