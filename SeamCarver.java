@@ -232,7 +232,7 @@ public class SeamCarver {
      */
     public void removeVerticalSeam(int[] seam) {
         if (seam == null) throw new IllegalArgumentException("The vertical seam does not have to be null");
-        if (seam.length > height()) throw new IllegalArgumentException("The vertical seam does not have to be bigger than height");
+        if (seam.length != height()) throw new IllegalArgumentException("The vertical seam does not have to be different from height");
 
         int[][] copyColor = new int[height()][width() - 1];
         double[][] copyEnergy = new double[height()][width() - 1];
