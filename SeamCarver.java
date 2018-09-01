@@ -253,7 +253,10 @@ public class SeamCarver {
 
         width--;
 
-        for (int row = 0; row < height(); row++) energy[row][seam[row]] = energy(seam[row], row);
+        for (int row = 0; row < height(); row++) {
+            if (seam[row] > width()-1) seam[row]--;
+            energy[row][seam[row]] = energy(seam[row], row);
+        }
 
     }
 
